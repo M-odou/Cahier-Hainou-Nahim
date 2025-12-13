@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cahier Hainou nahim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: '#13395F', // Hainounahim Color (Deep Navy Blue)
+              secondary: '#1e293b', // Slate 800
+              darkbg: '#0f172a', // Slate 900
+              cardbg: '#1e293b', // Slate 800 for cards
+            },
+            animation: {
+              'gradient-x': 'gradient-x 15s ease infinite',
+              'fade-in-up': 'fade-in-up 0.3s ease-out forwards',
+            },
+            keyframes: {
+              'gradient-x': {
+                '0%, 100%': {
+                  'background-size': '200% 200%',
+                  'background-position': 'left center',
+                },
+                '50%': {
+                  'background-size': '200% 200%',
+                  'background-position': 'right center',
+                },
+              },
+              'fade-in-up': {
+                '0%': {
+                  opacity: '0',
+                  transform: 'translateY(10px)',
+                },
+                '100%': {
+                  opacity: '1',
+                  transform: 'translateY(0)',
+                },
+              },
+            },
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@18.3.1/",
+    "react": "https://esm.sh/react@18.3.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+    "recharts": "https://esm.sh/recharts@2.12.7",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2"
+  }
+}
+</script>
+<style>
+  /* Custom Scrollbar for Dark Theme */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: #0f172a; 
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #334155; 
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569; 
+  }
+</style>
+</head>
+  <body class="bg-slate-50 dark:bg-darkbg text-slate-900 dark:text-slate-100 antialiased selection:bg-primary selection:text-white transition-colors duration-300">
+    <div id="root"></div>
+  </body>
+</html>
