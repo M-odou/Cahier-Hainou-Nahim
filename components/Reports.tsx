@@ -10,7 +10,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { Download, FileText, Eye, X } from 'lucide-react';
+import { Download, FileText, Eye, X, ExternalLink } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -43,8 +43,8 @@ const Reports: React.FC = () => {
 
   const generatePDFDocument = () => {
     const doc = new jsPDF();
-    const primaryColor = [19, 57, 95]; // #13395F
-    const pageWidth = doc.internal.pageSize.width; // 210mm for A4
+    const primaryColor = [19, 57, 95] as [number, number, number]; // #13395F
+    const pageWidth = doc.internal.pageSize.getWidth(); // Use getWidth() for better compatibility
 
     // --- Header ---
     // Background Band
@@ -167,6 +167,12 @@ const Reports: React.FC = () => {
     doc.save(`Rapport_Hainou_Nahim_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
+  const handleOpenInNewTab = () => {
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+    }
+  };
+
   const closePreview = () => {
     setShowPreview(false);
     if (pdfUrl) {
@@ -277,23 +283,45 @@ const Reports: React.FC = () => {
                 <FileText className="mr-2 text-primary dark:text-blue-400" size={20} />
                 Aperçu du Rapport
               </h3>
-              <button 
-                onClick={closePreview}
-                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                 <button 
+                  onClick={handleOpenInNewTab}
+                  className="sm:hidden p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors"
+                  title="Ouvrir dans un nouvel onglet"
+                >
+                  <ExternalLink size={20} />
+                </button>
+                <button 
+                  onClick={closePreview}
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
             
-            <div className="flex-1 bg-slate-100 dark:bg-slate-900 p-4 overflow-hidden">
+            <div className="flex-1 bg-slate-100 dark:bg-slate-900 p-4 overflow-hidden relative">
               <iframe 
+                key={pdfUrl}
                 src={pdfUrl} 
-                className="w-full h-full rounded-lg border border-slate-300 dark:border-slate-700 shadow-inner"
+                className="w-full h-full rounded-lg border border-slate-300 dark:border-slate-700 shadow-inner bg-white"
                 title="PDF Preview"
-              />
+              >
+                <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                  <p>Votre navigateur ne supporte pas l'affichage PDF.</p>
+                  <button onClick={handleOpenInNewTab} className="mt-2 text-blue-500 underline">Ouvrir le PDF</button>
+                </div>
+              </iframe>
             </div>
             
             <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end space-x-3">
+              <button 
+                onClick={handleOpenInNewTab}
+                className="hidden sm:flex px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors items-center"
+              >
+                <ExternalLink size={16} className="mr-2" />
+                Ouvrir dans un nouvel onglet
+              </button>
               <button 
                 onClick={closePreview}
                 className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -308,7 +336,7 @@ const Reports: React.FC = () => {
                 className="px-5 py-2.5 rounded-xl bg-primary hover:bg-blue-900 text-white font-bold shadow-lg shadow-blue-900/20 flex items-center transition-colors"
               >
                 <Download size={18} className="mr-2" />
-                Télécharger le fichier
+                Télécharger
               </button>
             </div>
           </div>

@@ -35,14 +35,14 @@ const MemberAutocomplete = ({ members, value, onChange }: { members: Member[], v
   );
 
   return (
-    <div className="relative flex-1" ref={wrapperRef}>
+    <div className="relative flex-1 w-full" ref={wrapperRef}>
        {!isOpen ? (
          <div 
            onClick={() => { setIsOpen(true); setSearchTerm(''); }}
-           className={`w-full rounded-xl border p-2.5 text-sm cursor-text flex items-center justify-between transition-all
+           className={`w-full rounded-xl border p-2.5 text-sm cursor-text flex items-center justify-between transition-all bg-white dark:bg-slate-800
              ${value 
-               ? 'bg-blue-50/50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-slate-800 dark:text-blue-100' 
-               : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-blue-400 dark:hover:border-blue-400'
+               ? 'border-blue-200 dark:border-blue-500/30 text-slate-800 dark:text-blue-100 ring-1 ring-blue-500/10' 
+               : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-blue-400 dark:hover:border-blue-400'
              }
            `}
          >
@@ -61,9 +61,9 @@ const MemberAutocomplete = ({ members, value, onChange }: { members: Member[], v
             )}
          </div>
        ) : (
-         <div className="absolute inset-0 z-20 w-full">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-blue-500 ring-2 ring-blue-500/20 overflow-hidden">
-               <div className="flex items-center px-3 py-2.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+         <div className="relative w-full">
+            {/* Input Container - Static Position */}
+            <div className="flex items-center px-3 py-2.5 border border-blue-500 rounded-t-xl bg-white dark:bg-slate-800 ring-2 ring-blue-500/20 z-10 relative shadow-sm">
                   <Search size={16} className="text-blue-500 mr-2 shrink-0" />
                   <input
                     ref={inputRef}
@@ -76,7 +76,10 @@ const MemberAutocomplete = ({ members, value, onChange }: { members: Member[], v
                   <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500">
                     <X size={14} />
                   </button>
-               </div>
+            </div>
+            
+            {/* Dropdown List - Absolute Position */}
+            <div className="absolute left-0 right-0 top-full bg-white dark:bg-slate-800 border-x border-b border-blue-500 rounded-b-xl shadow-2xl overflow-hidden z-50">
                <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
                   {filteredMembers.length > 0 ? (
                     filteredMembers.map(m => (
@@ -131,6 +134,9 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
     womenTotal: 0,
     socialTotal: 0
   });
+
+  // --- Confirmation Dialog State ---
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleHistorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,6 +255,14 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
     db.saveTourSchedules(newSchedules);
     setSchedules(db.getTourSchedules());
     alert('Planning enregistré avec succès !');
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      db.deleteTourSchedule(deleteId);
+      setSchedules(db.getTourSchedules());
+      setDeleteId(null);
+    }
   };
 
   // Group all schedules by month for the list view
@@ -509,7 +523,7 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
 
               <div className="space-y-4">
                 {planningRows.map((row) => (
-                  <div key={row.tempId} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in-up">
+                  <div key={row.tempId} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center space-x-2 w-full sm:w-auto">
                         <button 
                           onClick={() => removeRow(row.tempId)}
@@ -517,10 +531,28 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
                         >
                           <X size={16} />
                         </button>
-                        <div className="relative">
+                        <div className="relative group">
+                            <div 
+                                className="absolute inset-y-0 left-0 pl-3 flex items-center cursor-pointer z-10"
+                                onClick={() => {
+                                    const input = document.getElementById(`date-input-${row.tempId}`) as HTMLInputElement;
+                                    try {
+                                        if (input && typeof input.showPicker === 'function') {
+                                            input.showPicker();
+                                        } else if (input) {
+                                            input.focus();
+                                        }
+                                    } catch (e) {
+                                        input?.focus();
+                                    }
+                                }}
+                            >
+                                <CalendarIcon size={16} className="text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 dark:group-focus-within:text-blue-400 transition-colors hover:text-primary dark:hover:text-white" />
+                            </div>
                             <input 
+                              id={`date-input-${row.tempId}`}
                               type="date"
-                              className="w-full sm:w-40 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 px-3 text-sm text-slate-800 dark:text-white outline-none focus:border-primary dark:[color-scheme:dark]"
+                              className="pl-10 w-full sm:w-40 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 pr-3 text-sm text-slate-800 dark:text-white outline-none focus:border-primary dark:[color-scheme:dark]"
                               value={row.date}
                               onChange={(e) => updateRow(row.tempId, 'date', e.target.value)}
                             />
@@ -594,12 +626,7 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
                                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{getMemberName(s.memberId)}</p>
                               </div>
                               <button 
-                                onClick={() => {
-                                  if(confirm('Supprimer cette planification ?')) {
-                                    db.deleteTourSchedule(s.id);
-                                    setSchedules(db.getTourSchedules());
-                                  }
-                                }}
+                                onClick={() => setDeleteId(s.id)}
                                 className="text-slate-300 hover:text-red-500 transition-colors p-1"
                               >
                                 <Trash2 size={16} />
@@ -615,6 +642,37 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
                    <p className="text-slate-400 dark:text-slate-500 text-sm">Aucune planification à venir.</p>
                  </div>
                )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-cardbg p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200 dark:border-slate-700 transform transition-all scale-100">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center mb-4 text-red-500 dark:text-red-400">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Confirmer la suppression</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+                Êtes-vous sûr de vouloir supprimer cette planification ? Cette action est irréversible.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setDeleteId(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm shadow-lg shadow-red-500/30 transition-colors"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
           </div>
         </div>
