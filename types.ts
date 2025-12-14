@@ -45,6 +45,13 @@ export interface DahiraEvent {
   recordedBy: string;
 }
 
+export interface TourSchedule {
+  id: string;
+  date: string; // ISO Date string
+  memberId: string;
+  note?: string;
+}
+
 export interface DashboardStats {
   totalCollected: number;
   totalExpected: number;

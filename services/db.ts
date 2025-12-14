@@ -1,4 +1,4 @@
-import { Member, User, Contribution, Gender, Role, DahiraEvent } from '../types';
+import { Member, User, Contribution, Gender, Role, DahiraEvent, TourSchedule } from '../types';
 
 // Mock Data Service to simulate a Backend
 class DatabaseService {
@@ -55,6 +55,11 @@ class DatabaseService {
     }
   ];
 
+  private tourSchedules: TourSchedule[] = [
+    { id: 'ts1', date: '2023-12-03', memberId: '1' },
+    { id: 'ts2', date: '2023-12-10', memberId: '2' }
+  ];
+
   // --- Auth ---
   login(email: string, password: string): User | null {
     const user = this.users.find(u => u.email === email && u.password === password && u.active);
@@ -101,7 +106,7 @@ class DatabaseService {
     return this.members.flatMap(m => m.contributions);
   }
 
-  // --- Dahira Events ---
+  // --- Dahira Events (History) ---
   getDahiraEvents(): DahiraEvent[] {
     return [...this.events];
   }
@@ -110,6 +115,28 @@ class DatabaseService {
     const newEvent = { ...event, id: Math.random().toString(36).substr(2, 9) };
     this.events.push(newEvent);
     return newEvent;
+  }
+
+  // --- Tour Schedules (Planning) ---
+  getTourSchedules(): TourSchedule[] {
+    return [...this.tourSchedules];
+  }
+
+  saveTourSchedules(schedules: Omit<TourSchedule, 'id'>[]): void {
+    // Remove existing schedules for the same dates to avoid duplicates/conflicts
+    const datesToUpdate = schedules.map(s => s.date);
+    this.tourSchedules = this.tourSchedules.filter(s => !datesToUpdate.includes(s.date));
+    
+    // Add new ones
+    const newItems = schedules.map(s => ({
+      ...s,
+      id: Math.random().toString(36).substr(2, 9)
+    }));
+    this.tourSchedules.push(...newItems);
+  }
+
+  deleteTourSchedule(id: string): void {
+    this.tourSchedules = this.tourSchedules.filter(s => s.id !== id);
   }
 
   // --- Users ---
