@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
+import MemberSpace from './components/MemberSpace';
 import Members from './components/Members';
 import Contributions from './components/Contributions';
 import Reports from './components/Reports';
@@ -33,7 +34,12 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setActiveTab('dashboard'); // Reset to dashboard on login
+    // Redirect based on role
+    if (user.role === 'MEMBER') {
+        setActiveTab('member_space');
+    } else {
+        setActiveTab('dashboard');
+    }
   };
 
   const handleLogout = () => {
@@ -44,6 +50,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'member_space':
+        return <MemberSpace currentUser={currentUser!} />;
       case 'events':
         return <DahiraEvents currentUser={currentUser!} />;
       case 'members':
@@ -56,7 +64,8 @@ const App: React.FC = () => {
       case 'users':
         return <UserManagement />;
       default:
-        return <Dashboard />;
+        // Fallback safe for roles
+        return currentUser?.role === 'MEMBER' ? <MemberSpace currentUser={currentUser!} /> : <Dashboard />;
     }
   };
 

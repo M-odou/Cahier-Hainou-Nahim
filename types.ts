@@ -1,5 +1,5 @@
 
-export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'VIEWER';
+export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'VIEWER' | 'MEMBER';
 
 export enum Gender {
   Male = 'Homme',
@@ -13,6 +13,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  memberId?: string; // Links the login user to the specific member data
   password?: string; // In a real app, never store plain text
   active: boolean;
 }
@@ -31,6 +32,8 @@ export interface Member {
   lastName: string;
   gender: Gender;
   phone: string;
+  email?: string; // Added to link with User account
+  location?: string; // Quartier ou Adresse
   annualGoal: number;
   contributions: Contribution[];
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../services/db';
 import { Gender, Member } from '../types';
-import { Plus, Search, Filter, X, MessageCircle } from 'lucide-react';
+import { Plus, Search, Filter, X, MessageCircle, MapPin } from 'lucide-react';
 
 const Members: React.FC = () => {
   const [view, setView] = useState<'LIST' | 'ADD'>('LIST');
@@ -15,7 +15,8 @@ const Members: React.FC = () => {
     lastName: '',
     phone: '',
     gender: Gender.Male,
-    annualGoal: 12000
+    annualGoal: 12000,
+    location: ''
   });
 
   const handleAddMember = (e: React.FormEvent) => {
@@ -24,7 +25,7 @@ const Members: React.FC = () => {
     setMembers(db.getMembers());
     setView('LIST');
     // Reset form
-    setFormData({ firstName: '', lastName: '', phone: '', gender: Gender.Male, annualGoal: 12000 });
+    setFormData({ firstName: '', lastName: '', phone: '', gender: Gender.Male, annualGoal: 12000, location: '' });
   };
 
   const filteredMembers = members.filter(m => {
@@ -135,16 +136,28 @@ const Members: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 ml-1">Cotisation Annuelle (Objectif)</label>
-              <input 
-                type="number" 
-                required
-                min="0"
-                className="w-full rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-600 p-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
-                value={formData.annualGoal}
-                onChange={e => setFormData({...formData, annualGoal: parseInt(e.target.value) || 0})}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 ml-1">Quartier / Adresse</label>
+                 <input 
+                   type="text" 
+                   className="w-full rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-600 p-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+                   value={formData.location}
+                   onChange={e => setFormData({...formData, location: e.target.value})}
+                   placeholder="Ex: Ouest Foire"
+                 />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 ml-1">Cotisation Annuelle</label>
+                <input 
+                  type="number" 
+                  required
+                  min="0"
+                  className="w-full rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-600 p-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+                  value={formData.annualGoal}
+                  onChange={e => setFormData({...formData, annualGoal: parseInt(e.target.value) || 0})}
+                />
+              </div>
             </div>
 
             <div className="pt-6 flex justify-end">
@@ -225,6 +238,11 @@ const Members: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors">{member.firstName} {member.lastName}</div>
                           <div className="text-xs text-slate-500 sm:hidden mt-0.5">{member.phone}</div>
+                          {member.location && (
+                             <div className="text-[10px] text-slate-400 mt-0.5 flex items-center">
+                               <MapPin size={10} className="mr-0.5"/> {member.location}
+                             </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                           <span className={`px-2.5 py-1 inline-flex text-xs leading-4 font-bold rounded-lg ${badgeClass}`}>

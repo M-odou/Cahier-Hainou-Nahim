@@ -14,7 +14,7 @@ import {
   Pie, 
   Cell 
 } from 'recharts';
-import { TrendingUp, CheckCircle, Wallet, Users } from 'lucide-react';
+import { TrendingUp, CheckCircle, Wallet, Users, Award } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#ec4899', '#f59e0b']; // Blue, Pink, Amber
 
@@ -64,6 +64,24 @@ const Dashboard: React.FC = () => {
     { name: 'Hommes/Garçons', value: stats.maleCollected },
     { name: 'Femmes/Filles', value: stats.femaleCollected },
   ];
+
+  // Top Contributors Logic
+  const topContributors = useMemo(() => {
+    const data = members.map(m => {
+      const total = m.contributions.reduce((sum, c) => sum + c.amount, 0);
+      return {
+        name: `${m.firstName} ${m.lastName}`,
+        amount: total,
+        gender: m.gender
+      };
+    });
+
+    // Filter out 0 contributions and sort descending
+    return data
+      .filter(d => d.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10); // Top 10
+  }, [members]);
 
   return (
     <div className="space-y-6">
@@ -195,6 +213,51 @@ const Dashboard: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* Top Contributors Chart */}
+      <div className="bg-white dark:bg-cardbg p-6 rounded-2xl shadow-sm dark:shadow-lg border border-slate-200 dark:border-slate-700/50">
+          <div className="flex items-center mb-6">
+            <div className="p-2 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg mr-3">
+              <Award size={20} />
+            </div>
+            <div>
+               <h3 className="text-lg font-bold text-slate-800 dark:text-white">Top Contributeurs</h3>
+               <p className="text-xs text-slate-500 dark:text-slate-400">Classement par montant total versé</p>
+            </div>
+          </div>
+          
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart 
+                layout="vertical" 
+                data={topContributors} 
+                margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#94a3b8" strokeOpacity={0.3} />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  width={150} 
+                  tick={{fill: '#64748b', fontSize: 12}} 
+                  axisLine={false} 
+                  tickLine={false}
+                />
+                <Tooltip 
+                  cursor={{fill: '#334155', opacity: 0.1}}
+                  contentStyle={{ backgroundColor: '#1e293b', borderRadius: '12px', border: '1px solid #475569', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                  formatter={(value: number) => [`${value.toLocaleString()} FCFA`]} 
+                />
+                <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                  {topContributors.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.gender === Gender.Female || entry.gender === Gender.Girl ? '#ec4899' : '#3b82f6'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
       </div>
     </div>
   );

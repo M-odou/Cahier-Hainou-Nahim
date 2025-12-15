@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -9,7 +10,8 @@ import {
   CalendarCheck,
   Moon,
   Sun,
-  X
+  X,
+  UserCircle
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -27,10 +29,11 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ currentUser, activeTab, onTabChange, onLogout, isDarkMode, toggleTheme, isOpen, onClose }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'VIEWER'] },
-    { id: 'events', label: 'Événements', icon: CalendarCheck, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { id: 'member_space', label: 'Mon Espace', icon: UserCircle, roles: ['MEMBER'] },
+    { id: 'events', label: 'Événements', icon: CalendarCheck, roles: ['SUPER_ADMIN', 'ADMIN', 'MEMBER'] }, // Members can view events? Maybe
     { id: 'members', label: 'Membres', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { id: 'contributions', label: 'Cotisations', icon: Wallet, roles: ['SUPER_ADMIN', 'ADMIN'] },
-    { id: 'reports', label: 'Rapports', icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'VIEWER'] },
+    { id: 'reports', label: 'Rapports', icon: FileText, roles: ['SUPER_ADMIN', 'ADMIN', 'VIEWER'] }, // Members usually don't need global reports
     { id: 'users', label: 'Gestion Accès', icon: ShieldCheck, roles: ['SUPER_ADMIN'] },
   ];
 
@@ -45,7 +48,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, activeTab, onTabChange, 
           <div>
             <h2 className="text-xl font-bold text-primary dark:text-white tracking-tight">Cahier Hainou nahim</h2>
             <div className="inline-block px-2 py-0.5 mt-2 rounded bg-primary/10 dark:bg-white/10 border border-primary/10 dark:border-white/10">
-              <p className="text-[10px] text-primary dark:text-blue-200 uppercase tracking-wider font-bold">Espace {currentUser.role}</p>
+              <p className="text-[10px] text-primary dark:text-blue-200 uppercase tracking-wider font-bold">
+                 {currentUser.role === 'MEMBER' ? 'Espace Membre' : `Espace ${currentUser.role}`}
+              </p>
             </div>
           </div>
           {/* Mobile Close Button */}

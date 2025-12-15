@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 import { DahiraEvent, User, TourSchedule, Member } from '../types';
-import { CalendarCheck, Plus, X, Users, Heart, CalendarDays, History, Save, Trash2, ArrowRight, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { CalendarCheck, Plus, X, Users, Heart, CalendarDays, History, Save, Trash2, ArrowRight, Search, Calendar as CalendarIcon, MapPin } from 'lucide-react';
 
 interface DahiraEventsProps {
   currentUser: User;
@@ -113,7 +113,12 @@ interface PlanningRow {
 }
 
 const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'HISTORY' | 'PLANNING'>('HISTORY');
+  // Permissions Check
+  const canEdit = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN';
+  const isMember = currentUser.role === 'MEMBER';
+
+  // Force active tab to PLANNING if user is a member, otherwise default to HISTORY
+  const [activeTab, setActiveTab] = useState<'HISTORY' | 'PLANNING'>(isMember ? 'PLANNING' : 'HISTORY');
 
   // --- History Logic ---
   const [events, setEvents] = useState<DahiraEvent[]>(db.getDahiraEvents().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -122,6 +127,7 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
   // --- Planning Logic ---
   const [schedules, setSchedules] = useState<TourSchedule[]>(db.getTourSchedules());
   const [planningMonth, setPlanningMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [planningDuration, setPlanningDuration] = useState(1); // Months to generate
   const members = db.getMembers();
   
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -173,39 +179,61 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
   // --- Planning Logic Helpers ---
   const [planningRows, setPlanningRows] = useState<PlanningRow[]>([]);
 
-  // Initialize rows when month changes (Auto-fill Sundays and load existing)
+  // Initialize rows when month or duration changes (Auto-fill Sundays and load existing)
   useEffect(() => {
-    // 1. Get Sundays
-    const [year, month] = planningMonth.split('-').map(Number);
-    const date = new Date(year, month - 1, 1);
-    const sundays: string[] = [];
-    while (date.getDay() !== 0) date.setDate(date.getDate() + 1);
-    while (date.getMonth() === month - 1) {
-      sundays.push(date.toISOString().split('T')[0]);
-      date.setDate(date.getDate() + 7);
+    // 1. Calculate Date Range
+    const [startYear, startMonth] = planningMonth.split('-').map(Number);
+    const generatedSundays: string[] = [];
+    const minDateStr = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+    
+    // Calculate max date based on duration
+    let endYear = startYear;
+    let endMonth = startMonth + planningDuration;
+    if (endMonth > 12) {
+       endYear += Math.floor((endMonth - 1) / 12);
+       endMonth = ((endMonth - 1) % 12) + 1;
+    }
+    const maxDateStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    // 2. Generate Sundays for the entire duration
+    for (let i = 0; i < planningDuration; i++) {
+        let currentY = startYear;
+        let currentM = startMonth + i;
+        if (currentM > 12) {
+           currentY += Math.floor((currentM - 1) / 12);
+           currentM = ((currentM - 1) % 12) + 1;
+        }
+
+        const date = new Date(currentY, currentM - 1, 1);
+        while (date.getDay() !== 0) date.setDate(date.getDate() + 1);
+        
+        while (date.getMonth() === currentM - 1) {
+          generatedSundays.push(date.toISOString().split('T')[0]);
+          date.setDate(date.getDate() + 7);
+        }
     }
 
-    // 2. Get existing schedules for this month
-    const existing = schedules.filter(s => s.date.startsWith(planningMonth));
+    // 3. Get existing schedules within this broad range (approximately)
+    const existing = schedules.filter(s => s.date >= minDateStr && s.date < maxDateStr);
     const existingMap = new Map(existing.map(s => [s.date, s.memberId]));
 
-    // 3. Build rows
+    // 4. Build rows
     const newRows: PlanningRow[] = [];
     
-    // Add all existing schedules first (to ensure we see what's in DB)
+    // Add all existing schedules first
     existing.forEach(s => {
       newRows.push({
-        tempId: Math.random().toString(36),
+        tempId: Math.random().toString(36).substring(2, 9),
         date: s.date,
         memberId: s.memberId
       });
     });
 
     // Add Sundays that are missing from existing schedules
-    sundays.forEach(sundayDate => {
+    generatedSundays.forEach(sundayDate => {
       if (!existingMap.has(sundayDate)) {
         newRows.push({
-          tempId: Math.random().toString(36),
+          tempId: Math.random().toString(36).substring(2, 9),
           date: sundayDate,
           memberId: ''
         });
@@ -216,7 +244,7 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
     newRows.sort((a, b) => a.date.localeCompare(b.date));
 
     setPlanningRows(newRows);
-  }, [planningMonth, schedules]);
+  }, [planningMonth, planningDuration, schedules]);
 
   const updateRow = (tempId: string, field: 'date' | 'memberId', value: string) => {
     setPlanningRows(prev => prev.map(row => 
@@ -229,14 +257,14 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
   };
 
   const addRow = () => {
-    // Default to today or first day of selected month
+    // Default to first day of selected start month
     const defaultDate = planningMonth 
        ? `${planningMonth}-01` 
        : new Date().toISOString().split('T')[0];
     
     setPlanningRows(prev => [
       ...prev,
-      { tempId: Math.random().toString(36), date: defaultDate, memberId: '' }
+      { tempId: Math.random().toString(36).substring(2, 9), date: defaultDate, memberId: '' }
     ]);
   };
 
@@ -286,65 +314,74 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-           <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Gestion des Dahiras</h2>
-           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Historique financier et planification des tours</p>
+           <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">
+             {isMember ? 'Calendrier des Tours' : 'Gestion des Dahiras'}
+           </h2>
+           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+             {isMember ? 'Consultez les prochains hôtes du Dahira' : 'Historique financier et planification des tours'}
+           </p>
         </div>
         
-        {/* Tabs */}
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl">
-          <button
-            onClick={() => setActiveTab('HISTORY')}
-            className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'HISTORY' 
-              ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' 
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-            }`}
-          >
-            <History size={16} className="mr-2" />
-            Historique
-          </button>
-          <button
-            onClick={() => setActiveTab('PLANNING')}
-            className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'PLANNING' 
-              ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' 
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-            }`}
-          >
-            <CalendarDays size={16} className="mr-2" />
-            Planification
-          </button>
-        </div>
+        {/* Tabs - Hidden for Members */}
+        {!isMember && (
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl">
+            <button
+              onClick={() => setActiveTab('HISTORY')}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeTab === 'HISTORY' 
+                ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' 
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <History size={16} className="mr-2" />
+              Historique
+            </button>
+            <button
+              onClick={() => setActiveTab('PLANNING')}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeTab === 'PLANNING' 
+                ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' 
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <CalendarDays size={16} className="mr-2" />
+              Planification
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ================= HISTORY TAB ================= */}
-      {activeTab === 'HISTORY' && (
+      {/* Completely hidden for Members */}
+      {!isMember && activeTab === 'HISTORY' && (
         <>
           <div className="flex justify-end">
-            {showHistoryForm ? (
-              <button 
-                onClick={() => setShowHistoryForm(false)}
-                className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 px-5 py-2.5 rounded-xl flex items-center text-sm font-medium transition-colors"
-              >
-                <X size={18} className="mr-2" />
-                <span className="hidden sm:inline">Annuler</span>
-              </button>
-            ) : (
-              <button 
-                onClick={() => setShowHistoryForm(true)}
-                className="bg-primary hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl flex items-center text-sm font-bold transition-all shadow-lg shadow-blue-900/20"
-              >
-                <Plus size={18} className="mr-2" />
-                <span className="hidden sm:inline">Enregistrer un bilan</span>
-                <span className="sm:hidden">Nouveau</span>
-              </button>
+            {canEdit && (
+              showHistoryForm ? (
+                <button 
+                  onClick={() => setShowHistoryForm(false)}
+                  className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 px-5 py-2.5 rounded-xl flex items-center text-sm font-medium transition-colors"
+                >
+                  <X size={18} className="mr-2" />
+                  <span className="hidden sm:inline">Annuler</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setShowHistoryForm(true)}
+                  className="bg-primary hover:bg-blue-900 text-white px-5 py-2.5 rounded-xl flex items-center text-sm font-bold transition-all shadow-lg shadow-blue-900/20"
+                >
+                  <Plus size={18} className="mr-2" />
+                  <span className="hidden sm:inline">Enregistrer un bilan</span>
+                  <span className="sm:hidden">Nouveau</span>
+                </button>
+              )
             )}
           </div>
 
-          {showHistoryForm && (
+          {canEdit && showHistoryForm && (
             <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto animate-fade-in-up">
               <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">Enregistrer un Dahira (Bilan)</h3>
               <form onSubmit={handleHistorySubmit} className="space-y-6">
@@ -503,102 +540,118 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
 
       {/* ================= PLANNING TAB ================= */}
       {activeTab === 'PLANNING' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 ${canEdit ? 'lg:grid-cols-3' : ''} gap-6`}>
           
           {/* Left Column: Planning Form */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-cardbg p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50">
-              <div className="flex items-center justify-between mb-6">
-                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center">
-                    <CalendarDays className="mr-2 text-primary dark:text-blue-400" size={20} />
-                    Planifier le mois
-                 </h3>
-                 <input 
-                   type="month"
-                   className="rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-2 text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary dark:[color-scheme:dark]"
-                   value={planningMonth}
-                   onChange={(e) => setPlanningMonth(e.target.value)}
-                 />
-              </div>
-
-              <div className="space-y-4">
-                {planningRows.map((row) => (
-                  <div key={row.tempId} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center space-x-2 w-full sm:w-auto">
-                        <button 
-                          onClick={() => removeRow(row.tempId)}
-                          className="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                        <div className="relative group">
-                            <div 
-                                className="absolute inset-y-0 left-0 pl-3 flex items-center cursor-pointer z-10"
-                                onClick={() => {
-                                    const input = document.getElementById(`date-input-${row.tempId}`) as HTMLInputElement;
-                                    try {
-                                        if (input && typeof input.showPicker === 'function') {
-                                            input.showPicker();
-                                        } else if (input) {
-                                            input.focus();
-                                        }
-                                    } catch (e) {
-                                        input?.focus();
-                                    }
-                                }}
-                            >
-                                <CalendarIcon size={16} className="text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 dark:group-focus-within:text-blue-400 transition-colors hover:text-primary dark:hover:text-white" />
-                            </div>
-                            <input 
-                              id={`date-input-${row.tempId}`}
-                              type="date"
-                              className="pl-10 w-full sm:w-40 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 pr-3 text-sm text-slate-800 dark:text-white outline-none focus:border-primary dark:[color-scheme:dark]"
-                              value={row.date}
-                              onChange={(e) => updateRow(row.tempId, 'date', e.target.value)}
-                            />
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1 w-full sm:w-auto flex items-center gap-2">
-                        <ArrowRight size={16} className="text-slate-300 hidden sm:block shrink-0" />
-                        <MemberAutocomplete 
-                          members={members}
-                          value={row.memberId}
-                          onChange={(id) => updateRow(row.tempId, 'memberId', id)}
+          {canEdit && (
+            <div className="lg:col-span-2">
+              <div className="bg-white dark:bg-cardbg p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center">
+                      <CalendarDays className="mr-2 text-primary dark:text-blue-400" size={20} />
+                      Planifier
+                  </h3>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                      <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-1">
+                        <input 
+                          type="month"
+                          className="bg-transparent text-sm text-slate-800 dark:text-white outline-none px-2 dark:[color-scheme:dark]"
+                          value={planningMonth}
+                          onChange={(e) => setPlanningMonth(e.target.value)}
                         />
                       </div>
+                      <select
+                        className="rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-2 text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary"
+                        value={planningDuration}
+                        onChange={(e) => setPlanningDuration(parseInt(e.target.value))}
+                      >
+                        <option value={1}>1 Mois</option>
+                        <option value={3}>3 Mois</option>
+                        <option value={6}>6 Mois</option>
+                        <option value={12}>1 An</option>
+                      </select>
                   </div>
-                ))}
-                
-                {planningRows.length === 0 && (
-                   <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm italic">
-                      Aucune date planifiée pour ce mois.
-                   </div>
-                )}
+                </div>
 
-                <button 
-                  onClick={addRow}
-                  className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 font-bold text-sm hover:border-primary hover:text-primary dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors flex items-center justify-center"
-                >
-                  <Plus size={16} className="mr-2" />
-                  Ajouter une date
-                </button>
-              </div>
+                <div className="space-y-4">
+                  {planningRows.map((row) => (
+                    <div key={row.tempId} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center space-x-2 w-full sm:w-auto">
+                          <button 
+                            onClick={() => removeRow(row.tempId)}
+                            className="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          >
+                            <X size={16} />
+                          </button>
+                          <div className="relative group">
+                              <div 
+                                  className="absolute inset-y-0 left-0 pl-3 flex items-center cursor-pointer z-10"
+                                  onClick={() => {
+                                      const input = document.getElementById(`date-input-${row.tempId}`) as HTMLInputElement;
+                                      try {
+                                          if (input && typeof input.showPicker === 'function') {
+                                              input.showPicker();
+                                          } else if (input) {
+                                              input.focus();
+                                          }
+                                      } catch (e) {
+                                          input?.focus();
+                                      }
+                                  }}
+                              >
+                                  <CalendarIcon size={16} className="text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 dark:group-focus-within:text-blue-400 transition-colors hover:text-primary dark:hover:text-white" />
+                              </div>
+                              <input 
+                                id={`date-input-${row.tempId}`}
+                                type="date"
+                                className="pl-10 w-full sm:w-40 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 pr-3 text-sm text-slate-800 dark:text-white outline-none focus:border-primary dark:[color-scheme:dark]"
+                                value={row.date}
+                                onChange={(e) => updateRow(row.tempId, 'date', e.target.value)}
+                              />
+                          </div>
+                        </div>
+                        
+                        <div className="flex-1 w-full sm:w-auto flex items-center gap-2">
+                          <ArrowRight size={16} className="text-slate-300 hidden sm:block shrink-0" />
+                          <MemberAutocomplete 
+                            members={members}
+                            value={row.memberId}
+                            onChange={(id) => updateRow(row.tempId, 'memberId', id)}
+                          />
+                        </div>
+                    </div>
+                  ))}
+                  
+                  {planningRows.length === 0 && (
+                    <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm italic">
+                        Aucune date planifiée pour cette période.
+                    </div>
+                  )}
 
-              <div className="mt-8 flex justify-end">
-                <button 
-                  onClick={savePlanning}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center text-sm font-bold transition-all shadow-lg shadow-emerald-900/20"
-                >
-                  <Save size={18} className="mr-2" />
-                  Enregistrer le planning
-                </button>
+                  <button 
+                    onClick={addRow}
+                    className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 font-bold text-sm hover:border-primary hover:text-primary dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors flex items-center justify-center"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Ajouter une date manuellement
+                  </button>
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                  <button 
+                    onClick={savePlanning}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center text-sm font-bold transition-all shadow-lg shadow-emerald-900/20"
+                  >
+                    <Save size={18} className="mr-2" />
+                    Enregistrer le planning
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Right Column: Upcoming List */}
-          <div className="lg:col-span-1">
+          {/* Right Column (or Full for Members): Upcoming List Cards */}
+          <div className={canEdit ? "lg:col-span-1" : "max-w-6xl mx-auto w-full"}>
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center pt-2">
               <CalendarCheck size={20} className="mr-2 text-slate-400" />
               Prochains tours prévus
@@ -612,28 +665,55 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
                    
                    return (
                      <div key={monthKey} className="bg-white dark:bg-cardbg rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700/50 overflow-hidden">
-                       <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-300 capitalize text-sm">
+                       <div className="bg-primary/5 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-100 dark:border-slate-700 font-bold text-primary dark:text-blue-400 capitalize text-lg flex items-center">
+                         <CalendarDays size={20} className="mr-2 opacity-70"/>
                          {monthName}
                        </div>
-                       <ul className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                         {monthSchedules.sort((a,b) => a.date.localeCompare(b.date)).map(s => (
-                           <li key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                              <div>
-                                <div className="flex items-center text-xs font-bold text-primary dark:text-blue-400 mb-0.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-blue-400 mr-2"></span>
-                                  {new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })}
-                                </div>
-                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{getMemberName(s.memberId)}</p>
-                              </div>
-                              <button 
-                                onClick={() => setDeleteId(s.id)}
-                                className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                           </li>
-                         ))}
-                       </ul>
+                       
+                       <div className="p-4">
+                         <div className={`grid grid-cols-1 ${!canEdit ? 'sm:grid-cols-2 lg:grid-cols-3' : ''} gap-4`}>
+                            {monthSchedules.sort((a,b) => a.date.localeCompare(b.date)).map(s => {
+                               const dateObj = new Date(s.date);
+                               const member = members.find(m => m.id === s.memberId);
+                               
+                               return (
+                                 <div key={s.id} className="relative group bg-slate-50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500/50 p-5 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md flex flex-col items-center text-center">
+                                    {canEdit && (
+                                      <button 
+                                        onClick={() => setDeleteId(s.id)}
+                                        className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Supprimer"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+
+                                    {/* Date Badge */}
+                                    <div className="mb-3 bg-white dark:bg-slate-700 px-4 py-2 rounded-lg border border-slate-100 dark:border-slate-600 shadow-sm min-w-[80px]">
+                                       <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">{dateObj.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}</span>
+                                       <span className="block text-2xl font-black text-slate-800 dark:text-white">{dateObj.getDate()}</span>
+                                    </div>
+
+                                    <div className="mt-1 w-full">
+                                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-1 flex items-center justify-center">
+                                            Dahira chez
+                                        </p>
+                                        <h4 className="text-lg font-bold text-primary dark:text-blue-300 line-clamp-2 leading-tight">
+                                           {member ? `${member.firstName} ${member.lastName}` : 'Inconnu'}
+                                        </h4>
+                                        
+                                        {member?.location && (
+                                          <div className="mt-2 flex items-center justify-center text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 py-1 px-2 rounded-full w-fit mx-auto">
+                                            <MapPin size={10} className="mr-1 text-slate-400" />
+                                            {member.location}
+                                          </div>
+                                        )}
+                                    </div>
+                                 </div>
+                               )
+                            })}
+                         </div>
+                       </div>
                      </div>
                    );
                  })
@@ -648,7 +728,7 @@ const DahiraEvents: React.FC<DahiraEventsProps> = ({ currentUser }) => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteId && (
+      {deleteId && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white dark:bg-cardbg p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200 dark:border-slate-700 transform transition-all scale-100">
             <div className="flex flex-col items-center text-center">
